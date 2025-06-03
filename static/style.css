@@ -1,0 +1,18 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 2em auto;
+    background-color: #f9f9f9;
+    padding: 1em;
+    border-radius: 4px;
+}
+#chat-box {
+    border: 1px solid #ccc;
+    padding: 10px;
+    height: 300px;
+    overflow-y: scroll;
+    background: #fff;
+}
+.user { color: blue; margin: 5px 0; }
+.bot { color: green; margin: 5px 0; }
+.error { color: red; }
