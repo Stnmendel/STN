@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AetherAI Chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>AetherAI</h1>
+    <div id="chat-box"></div>
+    <input type="text" id="user-input" placeholder="Type your message" />
+    <button onclick="sendMessage()">Send</button>
+    <script>
+        async function sendMessage() {
+            const inputEl = document.getElementById('user-input');
+            const message = inputEl.value;
+            inputEl.value = '';
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user: 'demo@example.com', message})
+            });
+            const data = await res.json();
+            const box = document.getElementById('chat-box');
+            if (data.error) {
+                box.innerHTML += '<div class="error">'+data.error+'</div>';
+            } else {
+                box.innerHTML += '<div class="user">'+message+'</div>';
+                box.innerHTML += '<div class="bot">'+data.response+'</div>';
+            }
+        }
+    </script>
+</body>
+</html>
