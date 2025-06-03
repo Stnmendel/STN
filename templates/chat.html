@@ -8,7 +8,13 @@
 </head>
 <body>
     <h1>AetherAI</h1>
-    <div id="chat-box"></div>
+    <p>Logged in as {{ user }} - <a href="/logout">Logout</a></p>
+    <div id="chat-box">
+        {% for item in history %}
+            <div class="user">{{ item.user }}</div>
+            <div class="bot">{{ item.bot }}</div>
+        {% endfor %}
+    </div>
     <input type="text" id="user-input" placeholder="Type your message" />
     <button onclick="sendMessage()">Send</button>
     <script>
@@ -19,7 +25,7 @@
             const res = await fetch('/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user: 'demo@example.com', message})
+                body: JSON.stringify({message})
             });
             const data = await res.json();
             const box = document.getElementById('chat-box');

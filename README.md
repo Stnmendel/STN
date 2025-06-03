@@ -1,17 +1,18 @@
 # AetherAI Demo
 
-This repository contains a simple Flask web application demonstrating an AI assistant called **AetherAI**. The application includes a basic chat interface and a placeholder subscription check.
+This repository contains a small Flask web application demonstrating an AI assistant called **AetherAI**. The app now includes a simple login flow, a chat interface that remembers conversation history, and a configurable list of subscribed users.
 
 ## Running the app
 
-1. Install dependencies:
+1. Install dependencies from `requirements.txt`:
    ```bash
-   pip install flask
+   pip install -r requirements.txt
    ```
-2. Start the server:
+2. Optionally set subscribed users via the `AETHER_SUBSCRIBERS` environment variable (comma separated emails). The default is `demo@example.com`.
+3. Start the server:
    ```bash
    python app.py
    ```
-3. Open `http://localhost:5000` in your browser.
+4. Open `http://localhost:5000` in your browser and log in with one of the subscribed email addresses.
 
-A single demo user `demo@example.com` is subscribed by default. Integrate your own subscription and AI logic as needed.
+The default subscriber list contains only `demo@example.com`. Integrate your own subscription management and AI logic as needed.

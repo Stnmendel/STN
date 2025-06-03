@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>AetherAI Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Login</h1>
+    <form method="post" action="/login">
+        <input type="email" name="email" placeholder="Email" required />
+        <button type="submit">Login</button>
+    </form>
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+</body>
+</html>
