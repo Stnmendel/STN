@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Notes</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        #drawing-board {
+            border: 1px solid #333;
+            cursor: crosshair;
+        }
+        #notes-list img {
+            width: 100px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Notes</h1>
+    <canvas id="drawing-board" width="500" height="300"></canvas>
+    <br>
+    <button onclick="save()">Save</button>
+    <div id="notes-list"></div>
+    <script>
+        const canvas = document.getElementById('drawing-board');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', () => drawing = true);
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mouseout', () => drawing = false);
+        canvas.addEventListener('mousemove', draw);
+
+        function draw(e) {
+            if (!drawing) return;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+        }
+
+        async function save() {
+            const image = canvas.toDataURL();
+            await fetch('/notes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image})
+            });
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            loadNotes();
+        }
+
+        async function loadNotes() {
+            const res = await fetch('/notes/list');
+            const data = await res.json();
+            const container = document.getElementById('notes-list');
+            container.innerHTML = '';
+            data.notes.forEach(img => {
+                const el = document.createElement('img');
+                el.src = img;
+                container.appendChild(el);
+            });
+        }
+
+        loadNotes();
+    </script>
+</body>
+</html>
