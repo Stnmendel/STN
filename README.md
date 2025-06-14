@@ -16,3 +16,7 @@ This repository contains a small Flask web application demonstrating an AI assis
 4. Open `http://localhost:5000` in your browser and log in with one of the subscribed email addresses.
 
 The default subscriber list contains only `demo@example.com`. Integrate your own subscription management and AI logic as needed.
+
+## Starbazaar GUI
+
+Run `python starbazaar_gui.py` to launch the Tkinter-based Starbazaar search tool.
