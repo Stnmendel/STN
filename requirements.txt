@@ -1,1 +1,6 @@
 Flask
+
+requests
+Pillow
+cryptography
+
