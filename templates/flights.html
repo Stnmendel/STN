@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Flight Search</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Flight Search</h1>
+    <form id="search-form">
+        <label>From: <input type="text" id="origin" required></label><br>
+        <label>To: <input type="text" id="destination" required></label><br>
+        <label>Depart: <input type="date" id="depart" required></label><br>
+        <label>Return: <input type="date" id="return"></label><br>
+        <label>Max Price: <input type="number" id="max_price" placeholder="USD"></label><br>
+        <button type="submit">Search</button>
+    </form>
+    <div id="loading" style="display:none">Searching flights...</div>
+    <div id="results"></div>
+    <script>
+        const form = document.getElementById('search-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.getElementById('loading').style.display = 'block';
+            const payload = {
+                origin: document.getElementById('origin').value,
+                destination: document.getElementById('destination').value,
+                depart: document.getElementById('depart').value,
+                return: document.getElementById('return').value,
+                max_price: document.getElementById('max_price').value
+            };
+            const res = await fetch('/search_flights', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            document.getElementById('loading').style.display = 'none';
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            if (data.error) {
+                resultsDiv.innerHTML = '<div class="error">'+data.error+'</div>';
+                return;
+            }
+            if (!data.flights || data.flights.length === 0) {
+                resultsDiv.innerHTML = '<div>No flights found.</div>';
+                return;
+            }
+            data.flights.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'flight-item';
+                item.innerHTML = `<strong>${f.airline}</strong> - ${f.price} USD - ${f.depart} &rarr; ${f.arrive}`;
+                resultsDiv.appendChild(item);
+            });
+        });
+    </script>
+</body>
+</html>
