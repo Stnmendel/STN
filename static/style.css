@@ -16,3 +16,11 @@ body {
 .user { color: blue; margin: 5px 0; }
 .bot { color: green; margin: 5px 0; }
 .error { color: red; }
+
+.flight-item {
+    border-bottom: 1px solid #ddd;
+    padding: 10px 0;
+}
+@media (max-width: 600px) {
+    body { margin: 1em; }
+}
