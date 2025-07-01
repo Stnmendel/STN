@@ -1,35 +1,28 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AetherAI Chat</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <h1>AetherAI</h1>
-    <div id="chat-box"></div>
-    <input type="text" id="user-input" placeholder="Type your message" />
-    <button onclick="sendMessage()">Send</button>
-    <script>
-        async function sendMessage() {
-            const inputEl = document.getElementById('user-input');
-            const message = inputEl.value;
-            inputEl.value = '';
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user: 'demo@example.com', message})
-            });
-            const data = await res.json();
-            const box = document.getElementById('chat-box');
-            if (data.error) {
-                box.innerHTML += '<div class="error">'+data.error+'</div>';
-            } else {
-                box.innerHTML += '<div class="user">'+message+'</div>';
-                box.innerHTML += '<div class="bot">'+data.response+'</div>';
-            }
-        }
-    </script>
-</body>
-</html>
+{% extends 'base.html' %}
+{% block content %}
+<div class="trending">
+    <h2>Trendler</h2>
+    <div class="posts">
+    {% for post in trending %}
+        <div class="post-item">
+            <a href="/post/{{ post.id }}">
+                <img src="{{ post.image }}" alt="{{ post.title }}">
+                <h3>{{ post.title }}</h3>
+            </a>
+        </div>
+    {% endfor %}
+    </div>
+</div>
+
+<h2>Tüm Yazılar</h2>
+<div class="posts">
+{% for post in posts %}
+    <div class="post-item">
+        <a href="/post/{{ post.id }}">
+            <img src="{{ post.image }}" alt="{{ post.title }}">
+            <h3>{{ post.title }}</h3>
+        </a>
+    </div>
+{% endfor %}
+</div>
+{% endblock %}
