@@ -1,6 +1,7 @@
-# AetherAI Demo
+# Blog Demo
 
-This repository contains a simple Flask web application demonstrating an AI assistant called **AetherAI**. The application includes a basic chat interface and a placeholder subscription check.
+This repository contains a simple Flask web application that mimics an **Onedio** style blog.
+It showcases trending posts and standard articles with a minimal layout.
 
 ## Running the app
 
@@ -14,4 +15,5 @@ This repository contains a simple Flask web application demonstrating an AI assi
    ```
 3. Open `http://localhost:5000` in your browser.
 
-A single demo user `demo@example.com` is subscribed by default. Integrate your own subscription and AI logic as needed.
+Sample posts are defined in `app.py`. Modify them or integrate a real database
+as needed.
