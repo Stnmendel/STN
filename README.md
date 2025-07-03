@@ -15,3 +15,17 @@ This repository contains a simple Flask web application demonstrating an AI assi
 3. Open `http://localhost:5000` in your browser.
 
 A single demo user `demo@example.com` is subscribed by default. Integrate your own subscription and AI logic as needed.
+
+## Running the POS demo
+
+The repository also includes a small POS (Point of Sale) demo using PyQt6 and SQLAlchemy.
+To run it:
+
+```bash
+pip install PyQt6 sqlalchemy
+python -m pos_app.main
+```
+
+The application creates an SQLite database `pos.db` in the project directory and
+adds a default user (`Admin`/`1`). After logging in you can simulate sales by
+entering product barcodes.
