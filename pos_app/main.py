@@ -22,6 +22,7 @@ from .models import (
     SatisKaydi,
     Gider,
     CariHareket,
+    Ayar,
     Toptanci,
     MalAlimi,
     MalAlimiDetay,
@@ -39,9 +40,15 @@ Base.metadata.create_all(engine)
 session = Session()
 if not session.query(Kullanici).filter_by(kullanici_adi="Admin").first():
     hashed = hashlib.sha256("1".encode()).hexdigest()
-    admin = Kullanici(kullanici_adi="Admin", sifre=hashed)
+    admin = Kullanici(kullanici_adi="Admin", sifre=hashed, rol="Admin")
     session.add(admin)
     session.commit()
+
+for key in ["firma_adi", "adres", "telefon", "fis_alt_mesaj"]:
+    if not session.query(Ayar).filter_by(ayar_adi=key).first():
+        session.add(Ayar(ayar_adi=key, ayar_degeri=""))
+
+session.commit()
 session.close()
 
 
@@ -432,6 +439,128 @@ class SupplierManagementWindow(QtWidgets.QWidget):
         self.purchase_win.show()
 
 
+class UserManagementWindow(QtWidgets.QWidget):
+    """Personel yönetim penceresi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Personel İşlemleri")
+        self.setup_ui()
+        self.load_users()
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+        self.table = QtWidgets.QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels(["Kullanıcı Adı", "Rol"])
+        self.table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        layout.addWidget(self.table)
+
+        form = QtWidgets.QFormLayout()
+        self.user_edit = QtWidgets.QLineEdit()
+        self.role_combo = QtWidgets.QComboBox()
+        self.role_combo.addItems(["Admin", "Kasiyer"])
+        self.pass_edit = QtWidgets.QLineEdit()
+        self.pass_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        form.addRow("Kullanıcı Adı", self.user_edit)
+        form.addRow("Rol", self.role_combo)
+        form.addRow("Şifre", self.pass_edit)
+        layout.addLayout(form)
+
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.btn_save = QtWidgets.QPushButton("Kaydet")
+        self.btn_delete = QtWidgets.QPushButton("Sil")
+        btn_layout.addWidget(self.btn_save)
+        btn_layout.addWidget(self.btn_delete)
+        layout.addLayout(btn_layout)
+
+        self.btn_save.clicked.connect(self.save_user)
+        self.btn_delete.clicked.connect(self.delete_user)
+        self.table.itemSelectionChanged.connect(self.fill_form)
+
+    def load_users(self):
+        self.table.setRowCount(0)
+        for u in self.session.query(Kullanici).all():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(u.kullanici_adi))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(u.rol))
+
+    def fill_form(self):
+        items = self.table.selectedItems()
+        if not items:
+            self.user_edit.clear()
+            self.pass_edit.clear()
+            self.role_combo.setCurrentIndex(1)
+            return
+        self.user_edit.setText(items[0].text())
+        role = items[1].text()
+        idx = self.role_combo.findText(role)
+        if idx >= 0:
+            self.role_combo.setCurrentIndex(idx)
+
+    def save_user(self):
+        name = self.user_edit.text().strip()
+        if not name:
+            return
+        user = self.session.query(Kullanici).filter_by(kullanici_adi=name).first()
+        if not user:
+            user = Kullanici(kullanici_adi=name)
+            self.session.add(user)
+        pwd = self.pass_edit.text().strip()
+        if pwd:
+            user.sifre = hash_password(pwd)
+        user.rol = self.role_combo.currentText()
+        self.session.commit()
+        self.pass_edit.clear()
+        self.load_users()
+
+    def delete_user(self):
+        name = self.user_edit.text().strip()
+        user = self.session.query(Kullanici).filter_by(kullanici_adi=name).first()
+        if user:
+            self.session.delete(user)
+            self.session.commit()
+            self.load_users()
+
+
+class SettingsWindow(QtWidgets.QWidget):
+    """Genel ayarları düzenleme penceresi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Genel Ayarlar")
+        self.setup_ui()
+        self.load_settings()
+
+    def setup_ui(self):
+        self.edits = {}
+        layout = QtWidgets.QFormLayout(self)
+        for key in ["firma_adi", "adres", "telefon", "fis_alt_mesaj"]:
+            edit = QtWidgets.QLineEdit()
+            self.edits[key] = edit
+            layout.addRow(key.replace("_", " ").title(), edit)
+        btn = QtWidgets.QPushButton("Kaydet")
+        layout.addRow(btn)
+        btn.clicked.connect(self.save)
+
+    def load_settings(self):
+        for key, edit in self.edits.items():
+            rec = self.session.query(Ayar).filter_by(ayar_adi=key).first()
+            edit.setText(rec.ayar_degeri if rec else "")
+
+    def save(self):
+        for key, edit in self.edits.items():
+            rec = self.session.query(Ayar).filter_by(ayar_adi=key).first()
+            if rec:
+                rec.ayar_degeri = edit.text().strip()
+        self.session.commit()
+
+
+
 class AdminWindow(QtWidgets.QWidget):
     """Yönetici menüsü."""
 
@@ -447,17 +576,21 @@ class AdminWindow(QtWidgets.QWidget):
         self.btn_customers = QtWidgets.QPushButton("Müşteri İşlemleri")
         self.btn_suppliers = QtWidgets.QPushButton("Toptancı İşlemleri")
         self.btn_finance = QtWidgets.QPushButton("Finans ve Raporlar")
-        self.btn_settings = QtWidgets.QPushButton("Ayarlar")
+        self.btn_users = QtWidgets.QPushButton("Personel İşlemleri")
+        self.btn_settings = QtWidgets.QPushButton("Genel Ayarlar")
         layout.addWidget(self.btn_products)
         layout.addWidget(self.btn_customers)
         layout.addWidget(self.btn_suppliers)
         layout.addWidget(self.btn_finance)
+        layout.addWidget(self.btn_users)
         layout.addWidget(self.btn_settings)
 
         self.btn_products.clicked.connect(self.open_products)
         self.btn_customers.clicked.connect(self.open_customers)
         self.btn_suppliers.clicked.connect(self.open_suppliers)
         self.btn_finance.clicked.connect(self.open_finance)
+        self.btn_users.clicked.connect(self.open_users)
+        self.btn_settings.clicked.connect(self.open_settings)
 
     def open_products(self):
         self.product_win = ProductManagementWindow(self.session)
@@ -474,6 +607,14 @@ class AdminWindow(QtWidgets.QWidget):
     def open_finance(self):
         self.finance_win = FinanceWindow(self.session)
         self.finance_win.show()
+
+    def open_users(self):
+        self.user_win = UserManagementWindow(self.session)
+        self.user_win.show()
+
+    def open_settings(self):
+        self.settings_win = SettingsWindow(self.session)
+        self.settings_win.show()
 
 
 class CustomerSelectDialog(QtWidgets.QDialog):
@@ -858,8 +999,9 @@ class FinanceWindow(QtWidgets.QWidget):
 class MainWindow(QtWidgets.QWidget):
     """Ana POS ekranı."""
 
-    def __init__(self):
+    def __init__(self, user: Kullanici):
         super().__init__()
+        self.user = user
         self.setWindowTitle("POS")
         self.pending_qty = 1
         self.payment_type = "Nakit"
@@ -905,16 +1047,19 @@ class MainWindow(QtWidgets.QWidget):
         self.btn_kart = QtWidgets.QPushButton("[F3] K. KARTLI SATIŞ")
         self.btn_customer = QtWidgets.QPushButton("[F4] Müşteri Seç")
         self.btn_admin = QtWidgets.QPushButton("[F6] YÖNETİCİ")
+        self.btn_print_receipt = QtWidgets.QPushButton("[F12] Yazdır")
 
         btn_layout.addWidget(self.btn_nakit)
         btn_layout.addWidget(self.btn_kart)
         btn_layout.addWidget(self.btn_admin)
         btn_layout.insertWidget(2, self.btn_customer)
+        btn_layout.addWidget(self.btn_print_receipt)
 
         self.btn_nakit.clicked.connect(self.finish_sale_nakit)
         self.btn_kart.clicked.connect(self.start_kart_sale)
         self.btn_admin.clicked.connect(self.open_admin)
         self.btn_customer.clicked.connect(self.select_customer)
+        self.btn_print_receipt.clicked.connect(self.print_receipt)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent):
         if event.key() == QtCore.Qt.Key.Key_F1:
@@ -925,6 +1070,8 @@ class MainWindow(QtWidgets.QWidget):
             self.select_customer()
         elif event.key() == QtCore.Qt.Key.Key_F6:
             self.open_admin()
+        elif event.key() == QtCore.Qt.Key.Key_F12:
+            self.print_receipt()
         else:
             super().keyPressEvent(event)
 
@@ -1025,7 +1172,29 @@ class MainWindow(QtWidgets.QWidget):
             self.selected_customer = None
             self.customer_label.setText("Müşteri: -")
 
+    def print_receipt(self):
+        settings = {s.ayar_adi: s.ayar_degeri for s in self.session.query(Ayar).all()}
+        lines = [
+            settings.get("firma_adi", ""),
+            settings.get("adres", ""),
+            settings.get("telefon", ""),
+            "-" * 30,
+        ]
+        for item in self.sale_items.values():
+            p = item["product"]
+            qty = item["qty"]
+            lines.append(f"{p.urun_adi} x{qty} = {p.fiyat * qty:.2f}")
+        lines.append("-" * 30)
+        lines.append(f"Toplam: {self.total_label.text()}")
+        if settings.get("fis_alt_mesaj"):
+            lines.append(settings.get("fis_alt_mesaj"))
+        text = "\n".join(lines)
+        QtWidgets.QMessageBox.information(self, "Fiş", text)
+
     def open_admin(self):
+        if self.user.rol != "Admin":
+            QtWidgets.QMessageBox.warning(self, "Yetki", "Bu bölüme erişiminiz yok")
+            return
         self.admin_win = AdminWindow(self.session)
         self.admin_win.show()
 
@@ -1034,6 +1203,6 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     login = LoginWindow()
     if login.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-        window = MainWindow()
+        window = MainWindow(login.result)
         window.show()
         sys.exit(app.exec())

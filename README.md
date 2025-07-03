@@ -37,3 +37,5 @@ Müşteri hesaplarını yönetmek için Yönetici Panelinde bulunan **Müşteri 
 Finans işlemleri ve raporlamalar için **Finans ve Raporlar** menüsünü kullanın. Bu bölümde gider girişi yapabilir, müşterilerden tahsilat veya onlara yapılan ödemeleri kaydedebilir ve seçtiğiniz gün için özet kasa raporu alabilirsiniz.
 
 Stok girişleri ve tedarikçi takibi için **Toptancı İşlemleri** bölümünü kullanabilirsiniz. Buradan tedarikçilerinizi ekleyebilir ve "Yeni Mal Alımı Yap" seçeneği ile ürün alış faturaları oluşturabilirsiniz. Alım tamamlandığında ürün stok miktarları ve alış fiyatları güncellenir, ilgili toptancının bakiyesi ise fatura tutarı kadar artırılır.
+
+Personel yetkilerini yönetmek için **Personel İşlemleri** penceresini kullanın. Sadece `Admin` rolüne sahip kullanıcılar yönetici ekranlarına erişebilir ve genel ayarları güncelleyebilir. `Genel Ayarlar` menüsünde firma adı, adres gibi bilgileri düzenleyebilir ve F12 ile yazdırılan fişlerde kullanılmasını sağlayabilirsiniz.

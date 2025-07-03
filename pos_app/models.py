@@ -33,6 +33,7 @@ class Kullanici(Base):
     id = Column(Integer, primary_key=True)
     kullanici_adi = Column(String, unique=True, nullable=False)
     sifre = Column(String, nullable=False)
+    rol = Column(String, default="Kasiyer")
 
 
 class Musteri(Base):
@@ -87,6 +88,15 @@ class CariHareket(Base):
     tarih = Column(DateTime, default=datetime.utcnow)
 
     musteri = relationship('Musteri')
+
+
+class Ayar(Base):
+    """Genel ayarlar için basit anahtar-değer tablosu."""
+
+    __tablename__ = 'ayarlar'
+
+    ayar_adi = Column(String, primary_key=True)
+    ayar_degeri = Column(String)
 
 
 class Toptanci(Base):
