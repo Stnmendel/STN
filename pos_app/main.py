@@ -12,6 +12,7 @@ except Exception:
     ImageWriter = None
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
 from .models import (
     Base,
@@ -21,6 +22,9 @@ from .models import (
     SatisKaydi,
     Gider,
     CariHareket,
+    Toptanci,
+    MalAlimi,
+    MalAlimiDetay,
 )
 
 DB_URL = "sqlite:///pos.db"
@@ -100,8 +104,14 @@ class ProductManagementWindow(QtWidgets.QWidget):
 
     def setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
-        self.table = QtWidgets.QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Barkod", "Ürün Adı", "Fiyat", "Stok"])
+        self.table = QtWidgets.QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels([
+            "Barkod",
+            "Ürün Adı",
+            "Satış Fiyatı",
+            "Alış Fiyatı",
+            "Stok",
+        ])
         self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
@@ -110,11 +120,14 @@ class ProductManagementWindow(QtWidgets.QWidget):
         self.name_edit = QtWidgets.QLineEdit()
         self.price_edit = QtWidgets.QDoubleSpinBox()
         self.price_edit.setMaximum(999999)
+        self.buy_price_edit = QtWidgets.QDoubleSpinBox()
+        self.buy_price_edit.setMaximum(999999)
         self.stock_edit = QtWidgets.QSpinBox()
         self.stock_edit.setMaximum(999999)
         form.addRow("Barkod", self.barcode_edit)
         form.addRow("Ürün Adı", self.name_edit)
-        form.addRow("Fiyat", self.price_edit)
+        form.addRow("Satış Fiyatı", self.price_edit)
+        form.addRow("Alış Fiyatı", self.buy_price_edit)
         form.addRow("Stok", self.stock_edit)
         layout.addLayout(form)
 
@@ -140,7 +153,8 @@ class ProductManagementWindow(QtWidgets.QWidget):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(product.barkod))
             self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(product.urun_adi))
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{product.fiyat:.2f}"))
-            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(product.stok_miktari)))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{product.alis_fiyati:.2f}"))
+            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(product.stok_miktari)))
 
     def fill_form(self):
         items = self.table.selectedItems()
@@ -148,12 +162,14 @@ class ProductManagementWindow(QtWidgets.QWidget):
             self.barcode_edit.clear()
             self.name_edit.clear()
             self.price_edit.setValue(0)
+            self.buy_price_edit.setValue(0)
             self.stock_edit.setValue(0)
             return
         self.barcode_edit.setText(items[0].text())
         self.name_edit.setText(items[1].text())
         self.price_edit.setValue(float(items[2].text()))
-        self.stock_edit.setValue(int(items[3].text()))
+        self.buy_price_edit.setValue(float(items[3].text()))
+        self.stock_edit.setValue(int(items[4].text()))
 
     def generate_barcode(self) -> str:
         base = ''.join(str(random.randint(0, 9)) for _ in range(12))
@@ -176,6 +192,7 @@ class ProductManagementWindow(QtWidgets.QWidget):
 
         product.urun_adi = self.name_edit.text()
         product.fiyat = float(self.price_edit.value())
+        product.alis_fiyati = float(self.buy_price_edit.value())
         product.stok_miktari = int(self.stock_edit.value())
         self.session.commit()
         self.load_products()
@@ -325,6 +342,96 @@ class CustomerManagementWindow(QtWidgets.QWidget):
         dlg.exec()
 
 
+class SupplierManagementWindow(QtWidgets.QWidget):
+    """Toptancıların yönetimi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Toptancı İşlemleri")
+        self.setup_ui()
+        self.load_suppliers()
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+        self.table = QtWidgets.QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Firma Adı", "Bakiye", "Telefon"])
+        self.table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        layout.addWidget(self.table)
+
+        form = QtWidgets.QFormLayout()
+        self.name_edit = QtWidgets.QLineEdit()
+        self.phone_edit = QtWidgets.QLineEdit()
+        form.addRow("Firma Adı", self.name_edit)
+        form.addRow("Telefon", self.phone_edit)
+        layout.addLayout(form)
+
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.btn_save = QtWidgets.QPushButton("Kaydet")
+        self.btn_delete = QtWidgets.QPushButton("Sil")
+        self.btn_purchase = QtWidgets.QPushButton("Yeni Mal Alımı Yap")
+        btn_layout.addWidget(self.btn_save)
+        btn_layout.addWidget(self.btn_delete)
+        btn_layout.addWidget(self.btn_purchase)
+        layout.addLayout(btn_layout)
+
+        self.btn_save.clicked.connect(self.save_supplier)
+        self.btn_delete.clicked.connect(self.delete_supplier)
+        self.btn_purchase.clicked.connect(self.new_purchase)
+        self.table.itemSelectionChanged.connect(self.fill_form)
+
+    def load_suppliers(self):
+        self.table.setRowCount(0)
+        for sup in self.session.query(Toptanci).all():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(sup.firma_adi))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{sup.bakiye:.2f}"))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(sup.telefon or ""))
+
+    def fill_form(self):
+        items = self.table.selectedItems()
+        if not items:
+            self.name_edit.clear()
+            self.phone_edit.clear()
+            return
+        self.name_edit.setText(items[0].text())
+        self.phone_edit.setText(items[2].text())
+
+    def save_supplier(self):
+        name = self.name_edit.text().strip()
+        if not name:
+            return
+        sup = self.session.query(Toptanci).filter_by(firma_adi=name).first()
+        if not sup:
+            sup = Toptanci(firma_adi=name)
+            self.session.add(sup)
+
+        sup.telefon = self.phone_edit.text().strip()
+        self.session.commit()
+        self.load_suppliers()
+
+    def delete_supplier(self):
+        name = self.name_edit.text().strip()
+        sup = self.session.query(Toptanci).filter_by(firma_adi=name).first()
+        if sup:
+            self.session.delete(sup)
+            self.session.commit()
+            self.load_suppliers()
+
+    def new_purchase(self):
+        items = self.table.selectedItems()
+        supplier = None
+        if items:
+            supplier = self.session.query(Toptanci).filter_by(
+                firma_adi=items[0].text()
+            ).first()
+        self.purchase_win = PurchaseWindow(self.session, supplier)
+        self.purchase_win.show()
+
+
 class AdminWindow(QtWidgets.QWidget):
     """Yönetici menüsü."""
 
@@ -338,15 +445,18 @@ class AdminWindow(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         self.btn_products = QtWidgets.QPushButton("Ürün İşlemleri")
         self.btn_customers = QtWidgets.QPushButton("Müşteri İşlemleri")
+        self.btn_suppliers = QtWidgets.QPushButton("Toptancı İşlemleri")
         self.btn_finance = QtWidgets.QPushButton("Finans ve Raporlar")
         self.btn_settings = QtWidgets.QPushButton("Ayarlar")
         layout.addWidget(self.btn_products)
         layout.addWidget(self.btn_customers)
+        layout.addWidget(self.btn_suppliers)
         layout.addWidget(self.btn_finance)
         layout.addWidget(self.btn_settings)
 
         self.btn_products.clicked.connect(self.open_products)
         self.btn_customers.clicked.connect(self.open_customers)
+        self.btn_suppliers.clicked.connect(self.open_suppliers)
         self.btn_finance.clicked.connect(self.open_finance)
 
     def open_products(self):
@@ -356,6 +466,10 @@ class AdminWindow(QtWidgets.QWidget):
     def open_customers(self):
         self.customer_win = CustomerManagementWindow(self.session)
         self.customer_win.show()
+
+    def open_suppliers(self):
+        self.supplier_win = SupplierManagementWindow(self.session)
+        self.supplier_win.show()
 
     def open_finance(self):
         self.finance_win = FinanceWindow(self.session)
@@ -557,6 +671,157 @@ class ReportDialog(QtWidgets.QDialog):
             f"KASADAKİ NAKİT: {kasa_nakit:.2f}",
         ]
         self.result.setPlainText("\n".join(lines))
+
+
+class PurchaseWindow(QtWidgets.QWidget):
+    """Yeni mal alımı penceresi."""
+
+    def __init__(self, session: Session, supplier: Toptanci | None = None):
+        super().__init__()
+        self.session = session
+        self.pending_qty = 1
+        self.purchase_items: dict[str, dict] = {}
+        self.setWindowTitle("Mal Alımı")
+        self.setup_ui()
+        self.load_suppliers()
+        if supplier:
+            index = self.supplier_combo.findText(supplier.firma_adi)
+            if index >= 0:
+                self.supplier_combo.setCurrentIndex(index)
+
+    def setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        form = QtWidgets.QFormLayout()
+        self.supplier_combo = QtWidgets.QComboBox()
+        self.invoice_edit = QtWidgets.QLineEdit()
+        form.addRow("Toptancı", self.supplier_combo)
+        form.addRow("Fatura No", self.invoice_edit)
+        layout.addLayout(form)
+
+        self.table = QtWidgets.QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels([
+            "Ürün",
+            "Adet",
+            "Alış Fiyatı",
+            "Toplam",
+        ])
+        self.table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        layout.addWidget(self.table)
+
+        self.barcode_edit = QtWidgets.QLineEdit()
+        self.barcode_edit.setPlaceholderText("Barkod")
+        self.barcode_edit.returnPressed.connect(self.on_barcode_entered)
+        layout.addWidget(self.barcode_edit)
+
+        self.total_label = QtWidgets.QLabel("0.00")
+        font = self.total_label.font()
+        font.setPointSize(14)
+        self.total_label.setFont(font)
+        layout.addWidget(self.total_label)
+
+        self.btn_finish = QtWidgets.QPushButton("Alımı Tamamla")
+        layout.addWidget(self.btn_finish)
+        self.btn_finish.clicked.connect(self.finish_purchase)
+
+    def load_suppliers(self):
+        self.supplier_combo.clear()
+        for sup in self.session.query(Toptanci).all():
+            self.supplier_combo.addItem(sup.firma_adi, sup)
+
+    def on_barcode_entered(self):
+        text = self.barcode_edit.text().strip()
+        self.barcode_edit.clear()
+        if text.startswith("*"):
+            try:
+                self.pending_qty = int(text[1:])
+            except ValueError:
+                self.pending_qty = 1
+            return
+
+        product = self.session.query(Urun).filter_by(barkod=text).first()
+        if not product:
+            QtWidgets.QMessageBox.warning(self, "Hata", "Ürün bulunamadı")
+            self.pending_qty = 1
+            return
+
+        price, ok = QtWidgets.QInputDialog.getDouble(
+            self,
+            "Alış Fiyatı",
+            "Birim alış fiyatı",
+            product.alis_fiyati or product.fiyat,
+            0,
+            999999,
+            2,
+        )
+        if not ok:
+            self.pending_qty = 1
+            return
+        self.add_product(product, self.pending_qty, price)
+        self.pending_qty = 1
+
+    def add_product(self, product: Urun, qty: int, price: float):
+        if product.barkod in self.purchase_items:
+            row = self.purchase_items[product.barkod]["row"]
+            current_qty = self.purchase_items[product.barkod]["qty"] + qty
+            self.purchase_items[product.barkod]["qty"] = current_qty
+            self.purchase_items[product.barkod]["price"] = price
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(current_qty)))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{price:.2f}"))
+            self.table.setItem(
+                row, 3, QtWidgets.QTableWidgetItem(f"{current_qty * price:.2f}")
+            )
+        else:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(product.urun_adi))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(qty)))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{price:.2f}"))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{price * qty:.2f}"))
+            self.purchase_items[product.barkod] = {
+                "row": row,
+                "qty": qty,
+                "price": price,
+                "product": product,
+            }
+        self.update_total()
+
+    def update_total(self):
+        total = sum(v["price"] * v["qty"] for v in self.purchase_items.values())
+        self.total_label.setText(f"{total:.2f}")
+
+    def finish_purchase(self):
+        sup: Toptanci = self.supplier_combo.currentData()
+        if not sup:
+            QtWidgets.QMessageBox.warning(self, "Hata", "Toptancı seçin")
+            return
+        if not self.purchase_items:
+            return
+        total = sum(v["price"] * v["qty"] for v in self.purchase_items.values())
+        mal = MalAlimi(
+            toptanci_id=sup.id,
+            fatura_no=self.invoice_edit.text().strip(),
+            toplam_tutar=total,
+        )
+        self.session.add(mal)
+        for item in self.purchase_items.values():
+            product: Urun = item["product"]
+            qty = item["qty"]
+            price = item["price"]
+            det = MalAlimiDetay(
+                mal_alimi=mal,
+                urun_id=product.id,
+                adet=qty,
+                birim_alis_fiyati=price,
+            )
+            self.session.add(det)
+            product.stok_miktari += qty
+            product.alis_fiyati = price
+        sup.bakiye += total
+        self.session.commit()
+        self.close()
 
 
 class FinanceWindow(QtWidgets.QWidget):

@@ -35,3 +35,5 @@ yönetebilir ve python-barcode kurulmuşsa seçilen ürünün barkodunu
 Müşteri hesaplarını yönetmek için Yönetici Panelinde bulunan **Müşteri İşlemleri** bölümünü kullanabilirsiniz. Buradan yeni müşteri ekleyebilir ve veresiye satış bakiyelerini takip edebilirsiniz.
 
 Finans işlemleri ve raporlamalar için **Finans ve Raporlar** menüsünü kullanın. Bu bölümde gider girişi yapabilir, müşterilerden tahsilat veya onlara yapılan ödemeleri kaydedebilir ve seçtiğiniz gün için özet kasa raporu alabilirsiniz.
+
+Stok girişleri ve tedarikçi takibi için **Toptancı İşlemleri** bölümünü kullanabilirsiniz. Buradan tedarikçilerinizi ekleyebilir ve "Yeni Mal Alımı Yap" seçeneği ile ürün alış faturaları oluşturabilirsiniz. Alım tamamlandığında ürün stok miktarları ve alış fiyatları güncellenir, ilgili toptancının bakiyesi ise fatura tutarı kadar artırılır.

@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    ForeignKey,
+    DateTime,
+    Text,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -14,6 +22,7 @@ class Urun(Base):
     barkod = Column(String, unique=True, nullable=False)
     urun_adi = Column(String, nullable=False)
     fiyat = Column(Float, nullable=False)
+    alis_fiyati = Column(Float, default=0.0)
     stok_miktari = Column(Integer, default=0)
 
 class Kullanici(Base):
@@ -78,4 +87,47 @@ class CariHareket(Base):
     tarih = Column(DateTime, default=datetime.utcnow)
 
     musteri = relationship('Musteri')
+
+
+class Toptanci(Base):
+    """Ürünlerin alındığı tedarikçiler."""
+
+    __tablename__ = 'toptanci'
+
+    id = Column(Integer, primary_key=True)
+    firma_adi = Column(String, nullable=False)
+    telefon = Column(String)
+    bakiye = Column(Float, default=0.0)
+
+    alimlar = relationship('MalAlimi', back_populates='toptanci')
+
+
+class MalAlimi(Base):
+    """Alış faturası başlığı."""
+
+    __tablename__ = 'malalimi'
+
+    id = Column(Integer, primary_key=True)
+    toptanci_id = Column(Integer, ForeignKey('toptanci.id'))
+    fatura_no = Column(String)
+    alim_tarihi = Column(DateTime, default=datetime.utcnow)
+    toplam_tutar = Column(Float, default=0.0)
+
+    toptanci = relationship('Toptanci', back_populates='alimlar')
+    kalemler = relationship('MalAlimiDetay', back_populates='mal_alimi')
+
+
+class MalAlimiDetay(Base):
+    """Alış faturası kalemleri."""
+
+    __tablename__ = 'malalimidetay'
+
+    id = Column(Integer, primary_key=True)
+    mal_alimi_id = Column(Integer, ForeignKey('malalimi.id'))
+    urun_id = Column(Integer, ForeignKey('urun.id'))
+    adet = Column(Integer, default=0)
+    birim_alis_fiyati = Column(Float, default=0.0)
+
+    mal_alimi = relationship('MalAlimi', back_populates='kalemler')
+    urun = relationship('Urun')
 
