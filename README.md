@@ -31,3 +31,5 @@ adds a default user (`Admin`/`1`). After logging in you can simulate sales by
 entering product barcodes. F6 tuşu ile açılan Yönetici Paneli üzerinden ürünleri
 yönetebilir ve python-barcode kurulmuşsa seçilen ürünün barkodunu
 `static/barcodes` klasörüne kaydedebilirsiniz.
+
+Müşteri hesaplarını yönetmek için Yönetici Panelinde bulunan **Müşteri İşlemleri** bölümünü kullanabilirsiniz. Buradan yeni müşteri ekleyebilir ve veresiye satış bakiyelerini takip edebilirsiniz.
