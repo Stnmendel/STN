@@ -25,6 +25,8 @@ class Urun(Base):
     alis_fiyati = Column(Float, default=0.0)
     stok_miktari = Column(Integer, default=0)
 
+    satis_kalemleri = relationship('SatisKalem', back_populates='urun')
+
 class Kullanici(Base):
     """Kullanıcı modelini temsil eder."""
 
@@ -63,6 +65,7 @@ class SatisKaydi(Base):
     musteri_id = Column(Integer, ForeignKey('musteri.id'))
 
     musteri = relationship('Musteri', back_populates='satislar')
+    kalemler = relationship('SatisKalem', back_populates='satis')
 
 
 class Gider(Base):
@@ -140,4 +143,20 @@ class MalAlimiDetay(Base):
 
     mal_alimi = relationship('MalAlimi', back_populates='kalemler')
     urun = relationship('Urun')
+
+
+class SatisKalem(Base):
+    """Satış kalemleri"""
+
+    __tablename__ = 'satiskalem'
+
+    id = Column(Integer, primary_key=True)
+    satis_id = Column(Integer, ForeignKey('satiskaydi.id'))
+    urun_id = Column(Integer, ForeignKey('urun.id'))
+    adet = Column(Integer, default=0)
+    birim_satis_fiyati = Column(Float, default=0.0)
+    birim_alis_fiyati = Column(Float, default=0.0)
+
+    satis = relationship('SatisKaydi', back_populates='kalemler')
+    urun = relationship('Urun', back_populates='satis_kalemleri')
 

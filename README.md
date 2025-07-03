@@ -39,3 +39,5 @@ Finans işlemleri ve raporlamalar için **Finans ve Raporlar** menüsünü kulla
 Stok girişleri ve tedarikçi takibi için **Toptancı İşlemleri** bölümünü kullanabilirsiniz. Buradan tedarikçilerinizi ekleyebilir ve "Yeni Mal Alımı Yap" seçeneği ile ürün alış faturaları oluşturabilirsiniz. Alım tamamlandığında ürün stok miktarları ve alış fiyatları güncellenir, ilgili toptancının bakiyesi ise fatura tutarı kadar artırılır.
 
 Personel yetkilerini yönetmek için **Personel İşlemleri** penceresini kullanın. Sadece `Admin` rolüne sahip kullanıcılar yönetici ekranlarına erişebilir ve genel ayarları güncelleyebilir. `Genel Ayarlar` menüsünde firma adı, adres gibi bilgileri düzenleyebilir ve F12 ile yazdırılan fişlerde kullanılmasını sağlayabilirsiniz.
+
+Finans menüsündeki **Gelişmiş Raporlar** ekranı; seçilen tarih aralığında kâr/zarar analizi, ürün bazında kârlılık, en çok satan ürünler ve stok değeri gibi raporları sunar. Ayrıca **Yardımcı Araçlar** bölümünden veritabanını yedekleyebilir veya bir yedeği geri yükleyebilirsiniz.

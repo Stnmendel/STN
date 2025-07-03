@@ -13,6 +13,7 @@ except Exception:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import shutil
 
 from .models import (
     Base,
@@ -20,6 +21,7 @@ from .models import (
     Urun,
     Musteri,
     SatisKaydi,
+    SatisKalem,
     Gider,
     CariHareket,
     Ayar,
@@ -578,12 +580,14 @@ class AdminWindow(QtWidgets.QWidget):
         self.btn_finance = QtWidgets.QPushButton("Finans ve Raporlar")
         self.btn_users = QtWidgets.QPushButton("Personel İşlemleri")
         self.btn_settings = QtWidgets.QPushButton("Genel Ayarlar")
+        self.btn_tools = QtWidgets.QPushButton("Yardımcı Araçlar")
         layout.addWidget(self.btn_products)
         layout.addWidget(self.btn_customers)
         layout.addWidget(self.btn_suppliers)
         layout.addWidget(self.btn_finance)
         layout.addWidget(self.btn_users)
         layout.addWidget(self.btn_settings)
+        layout.addWidget(self.btn_tools)
 
         self.btn_products.clicked.connect(self.open_products)
         self.btn_customers.clicked.connect(self.open_customers)
@@ -591,6 +595,7 @@ class AdminWindow(QtWidgets.QWidget):
         self.btn_finance.clicked.connect(self.open_finance)
         self.btn_users.clicked.connect(self.open_users)
         self.btn_settings.clicked.connect(self.open_settings)
+        self.btn_tools.clicked.connect(self.open_tools)
 
     def open_products(self):
         self.product_win = ProductManagementWindow(self.session)
@@ -615,6 +620,10 @@ class AdminWindow(QtWidgets.QWidget):
     def open_settings(self):
         self.settings_win = SettingsWindow(self.session)
         self.settings_win.show()
+
+    def open_tools(self):
+        self.tools_win = ToolsWindow()
+        self.tools_win.show()
 
 
 class CustomerSelectDialog(QtWidgets.QDialog):
@@ -814,6 +823,147 @@ class ReportDialog(QtWidgets.QDialog):
         self.result.setPlainText("\n".join(lines))
 
 
+class AdvancedReportsDialog(QtWidgets.QDialog):
+    """Gelişmiş raporlar"""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Gelişmiş Raporlar")
+        layout = QtWidgets.QVBoxLayout(self)
+        range_layout = QtWidgets.QHBoxLayout()
+        range_layout.addWidget(QtWidgets.QLabel("Başlangıç:"))
+        self.start_edit = QtWidgets.QDateEdit(QtCore.QDate.currentDate())
+        self.start_edit.setCalendarPopup(True)
+        range_layout.addWidget(self.start_edit)
+        range_layout.addWidget(QtWidgets.QLabel("Bitiş:"))
+        self.end_edit = QtWidgets.QDateEdit(QtCore.QDate.currentDate())
+        self.end_edit.setCalendarPopup(True)
+        range_layout.addWidget(self.end_edit)
+        layout.addLayout(range_layout)
+
+        self.tabs = QtWidgets.QTabWidget()
+        layout.addWidget(self.tabs)
+
+        self.txt_profit = QtWidgets.QTextEdit()
+        self.txt_profit.setReadOnly(True)
+        self.tabs.addTab(self.txt_profit, "Kâr/Zarar")
+
+        self.tbl_product = QtWidgets.QTableWidget(0, 6)
+        self.tbl_product.setHorizontalHeaderLabels([
+            "Ürün", "Adet", "Gelir", "Maliyet", "Kâr", "Kâr %",
+        ])
+        self.tbl_product.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        self.tabs.addTab(self.tbl_product, "Ürün Bazında")
+
+        self.tbl_best = QtWidgets.QTableWidget(0, 2)
+        self.tbl_best.setHorizontalHeaderLabels(["Ürün", "Adet"])
+        self.tbl_best.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        self.tabs.addTab(self.tbl_best, "En Çok Satan")
+
+        self.txt_stock = QtWidgets.QTextEdit()
+        self.txt_stock.setReadOnly(True)
+        self.tabs.addTab(self.txt_stock, "Stok Değeri")
+
+        btn = QtWidgets.QPushButton("Hesapla")
+        layout.addWidget(btn)
+        btn.clicked.connect(self.calculate)
+
+    def calculate(self):
+        start = datetime.combine(
+            self.start_edit.date().toPyDate(), datetime.min.time()
+        )
+        end = datetime.combine(self.end_edit.date().toPyDate(), datetime.max.time())
+
+        kalemler = (
+            self.session.query(SatisKalem)
+            .join(SatisKaydi)
+            .filter(SatisKaydi.tarih >= start, SatisKaydi.tarih <= end)
+            .all()
+        )
+        gelir = sum(k.birim_satis_fiyati * k.adet for k in kalemler)
+        maliyet = sum(k.birim_alis_fiyati * k.adet for k in kalemler)
+        brut = gelir - maliyet
+        gider = sum(
+            g.tutar
+            for g in self.session.query(Gider).filter(Gider.tarih >= start, Gider.tarih <= end)
+        )
+        net = brut - gider
+        marj = (net / gelir * 100) if gelir else 0
+        lines = [
+            f"Toplam Gelir: {gelir:.2f}",
+            f"SMM: {maliyet:.2f}",
+            f"Brüt Kâr: {brut:.2f}",
+            f"Toplam Giderler: {gider:.2f}",
+            f"Net Kâr: {net:.2f}",
+            f"Net Kâr Marjı: {marj:.2f}%",
+        ]
+        self.txt_profit.setPlainText("\n".join(lines))
+
+        # Ürün bazında kâr
+        from sqlalchemy import func
+
+        rows = (
+            self.session.query(
+                Urun.urun_adi,
+                func.sum(SatisKalem.adet),
+                func.sum(SatisKalem.adet * SatisKalem.birim_satis_fiyati),
+                func.sum(SatisKalem.adet * SatisKalem.birim_alis_fiyati),
+            )
+            .join(SatisKalem)
+            .join(SatisKaydi)
+            .filter(SatisKaydi.tarih >= start, SatisKaydi.tarih <= end)
+            .group_by(Urun.id)
+            .all()
+        )
+        self.tbl_product.setRowCount(0)
+        for r in rows:
+            adet = r[1] or 0
+            gelir_p = r[2] or 0
+            maliyet_p = r[3] or 0
+            kar = gelir_p - maliyet_p
+            kar_m = (kar / gelir_p * 100) if gelir_p else 0
+            row = self.tbl_product.rowCount()
+            self.tbl_product.insertRow(row)
+            self.tbl_product.setItem(row, 0, QtWidgets.QTableWidgetItem(r[0]))
+            self.tbl_product.setItem(row, 1, QtWidgets.QTableWidgetItem(str(int(adet))))
+            self.tbl_product.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{gelir_p:.2f}"))
+            self.tbl_product.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{maliyet_p:.2f}"))
+            self.tbl_product.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{kar:.2f}"))
+            self.tbl_product.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{kar_m:.2f}%"))
+
+        self.tbl_product.sortItems(5, QtCore.Qt.SortOrder.DescendingOrder)
+
+        # En çok satanlar
+        best_rows = (
+            self.session.query(
+                Urun.urun_adi,
+                func.sum(SatisKalem.adet).label('adet')
+            )
+            .join(SatisKalem)
+            .join(SatisKaydi)
+            .filter(SatisKaydi.tarih >= start, SatisKaydi.tarih <= end)
+            .group_by(Urun.id)
+            .order_by(func.sum(SatisKalem.adet).desc())
+            .all()
+        )
+        self.tbl_best.setRowCount(0)
+        for r in best_rows:
+            row = self.tbl_best.rowCount()
+            self.tbl_best.insertRow(row)
+            self.tbl_best.setItem(row, 0, QtWidgets.QTableWidgetItem(r[0]))
+            self.tbl_best.setItem(row, 1, QtWidgets.QTableWidgetItem(str(int(r[1]))))
+
+        # Stok değeri
+        stock_total = sum(u.stok_miktari * u.alis_fiyati for u in self.session.query(Urun))
+        lines = [f"Toplam Stok Değeri: {stock_total:.2f}"]
+        self.txt_stock.setPlainText("\n".join(lines))
+
+
 class PurchaseWindow(QtWidgets.QWidget):
     """Yeni mal alımı penceresi."""
 
@@ -975,13 +1125,16 @@ class FinanceWindow(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         self.btn_expense = QtWidgets.QPushButton("Gider Ekle")
         self.btn_cash = QtWidgets.QPushButton("Tahsilat/Tediye Yap")
-        self.btn_report = QtWidgets.QPushButton("Raporlar")
+        self.btn_report = QtWidgets.QPushButton("Gün Sonu Raporu")
+        self.btn_adv_report = QtWidgets.QPushButton("Gelişmiş Raporlar")
         layout.addWidget(self.btn_expense)
         layout.addWidget(self.btn_cash)
         layout.addWidget(self.btn_report)
+        layout.addWidget(self.btn_adv_report)
         self.btn_expense.clicked.connect(self.add_expense)
         self.btn_cash.clicked.connect(self.add_cash)
         self.btn_report.clicked.connect(self.show_report)
+        self.btn_adv_report.clicked.connect(self.show_advanced)
 
     def add_expense(self):
         dlg = ExpenseDialog(self.session)
@@ -994,6 +1147,54 @@ class FinanceWindow(QtWidgets.QWidget):
     def show_report(self):
         dlg = ReportDialog(self.session)
         dlg.exec()
+
+    def show_advanced(self):
+        dlg = AdvancedReportsDialog(self.session)
+        dlg.exec()
+
+
+class ToolsWindow(QtWidgets.QWidget):
+    """Yedekleme ve geri yükleme araçları."""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Yardımcı Araçlar")
+        layout = QtWidgets.QVBoxLayout(self)
+        self.btn_backup = QtWidgets.QPushButton("Yedekle")
+        self.btn_restore = QtWidgets.QPushButton("Geri Yükle")
+        layout.addWidget(self.btn_backup)
+        layout.addWidget(self.btn_restore)
+        self.btn_backup.clicked.connect(self.backup)
+        self.btn_restore.clicked.connect(self.restore)
+
+    def backup(self):
+        db_path = Path(DB_URL.split("///")[-1])
+        backup_dir = Path("yedekler")
+        backup_dir.mkdir(exist_ok=True)
+        name = datetime.now().strftime("yedek_%d-%m-%Y_%H-%M.db")
+        shutil.copy(db_path, backup_dir / name)
+        QtWidgets.QMessageBox.information(self, "Yedek", "Yedekleme başarıyla tamamlandı")
+
+    def restore(self):
+        backup_dir = Path("yedekler")
+        backup_dir.mkdir(exist_ok=True)
+        files = [f.name for f in backup_dir.glob("*.db")]
+        if not files:
+            QtWidgets.QMessageBox.information(self, "Geri Yükle", "Yedek bulunamadı")
+            return
+        file, ok = QtWidgets.QInputDialog.getItem(self, "Geri Yükle", "Dosya seç", files, 0, False)
+        if not ok:
+            return
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Onay",
+            "UYARI: Bu işlem tüm mevcut verileri silecek ve seçili yedekle değiştirecektir. Emin misiniz?",
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+        db_path = Path(DB_URL.split("///")[-1])
+        shutil.copy(backup_dir / file, db_path)
+        QtWidgets.QMessageBox.information(self, "Geri Yükle", "Geri yükleme tamamlandı. Programı yeniden başlatın.")
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -1153,6 +1354,16 @@ class MainWindow(QtWidgets.QWidget):
             musteri_id=self.selected_customer.id if self.selected_customer else None,
         )
         self.session.add(sale)
+        for item in self.sale_items.values():
+            urun = item['product']
+            kalem = SatisKalem(
+                satis=sale,
+                urun_id=urun.id,
+                adet=item['qty'],
+                birim_satis_fiyati=urun.fiyat,
+                birim_alis_fiyati=urun.alis_fiyati,
+            )
+            self.session.add(kalem)
         if self.selected_customer:
             self.selected_customer.bakiye += total
         self.session.commit()
