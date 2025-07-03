@@ -33,3 +33,5 @@ yönetebilir ve python-barcode kurulmuşsa seçilen ürünün barkodunu
 `static/barcodes` klasörüne kaydedebilirsiniz.
 
 Müşteri hesaplarını yönetmek için Yönetici Panelinde bulunan **Müşteri İşlemleri** bölümünü kullanabilirsiniz. Buradan yeni müşteri ekleyebilir ve veresiye satış bakiyelerini takip edebilirsiniz.
+
+Finans işlemleri ve raporlamalar için **Finans ve Raporlar** menüsünü kullanın. Bu bölümde gider girişi yapabilir, müşterilerden tahsilat veya onlara yapılan ödemeleri kaydedebilir ve seçtiğiniz gün için özet kasa raporu alabilirsiniz.

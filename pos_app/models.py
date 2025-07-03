@@ -54,3 +54,28 @@ class SatisKaydi(Base):
 
     musteri = relationship('Musteri', back_populates='satislar')
 
+
+class Gider(Base):
+    """Kasa çıkışlarını temsil eden giderler."""
+
+    __tablename__ = 'gider'
+
+    id = Column(Integer, primary_key=True)
+    aciklama = Column(String, nullable=False)
+    tutar = Column(Float, nullable=False)
+    tarih = Column(DateTime, default=datetime.utcnow)
+
+
+class CariHareket(Base):
+    """Müşteri hesap hareketleri (tahsilat/tediye)."""
+
+    __tablename__ = 'carihareket'
+
+    id = Column(Integer, primary_key=True)
+    musteri_id = Column(Integer, ForeignKey('musteri.id'))
+    tutar = Column(Float, nullable=False)
+    aciklama = Column(String, nullable=False)
+    tarih = Column(DateTime, default=datetime.utcnow)
+
+    musteri = relationship('Musteri')
+

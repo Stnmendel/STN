@@ -13,7 +13,15 @@ except Exception:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base, Kullanici, Urun, Musteri, SatisKaydi
+from .models import (
+    Base,
+    Kullanici,
+    Urun,
+    Musteri,
+    SatisKaydi,
+    Gider,
+    CariHareket,
+)
 
 DB_URL = "sqlite:///pos.db"
 
@@ -330,15 +338,16 @@ class AdminWindow(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         self.btn_products = QtWidgets.QPushButton("Ürün İşlemleri")
         self.btn_customers = QtWidgets.QPushButton("Müşteri İşlemleri")
-        self.btn_reports = QtWidgets.QPushButton("Raporlar")
+        self.btn_finance = QtWidgets.QPushButton("Finans ve Raporlar")
         self.btn_settings = QtWidgets.QPushButton("Ayarlar")
         layout.addWidget(self.btn_products)
         layout.addWidget(self.btn_customers)
-        layout.addWidget(self.btn_reports)
+        layout.addWidget(self.btn_finance)
         layout.addWidget(self.btn_settings)
 
         self.btn_products.clicked.connect(self.open_products)
         self.btn_customers.clicked.connect(self.open_customers)
+        self.btn_finance.clicked.connect(self.open_finance)
 
     def open_products(self):
         self.product_win = ProductManagementWindow(self.session)
@@ -347,6 +356,10 @@ class AdminWindow(QtWidgets.QWidget):
     def open_customers(self):
         self.customer_win = CustomerManagementWindow(self.session)
         self.customer_win.show()
+
+    def open_finance(self):
+        self.finance_win = FinanceWindow(self.session)
+        self.finance_win.show()
 
 
 class CustomerSelectDialog(QtWidgets.QDialog):
@@ -401,6 +414,180 @@ class CustomerSelectDialog(QtWidgets.QDialog):
         )
         if self.selected_customer:
             self.accept()
+
+
+class ExpenseDialog(QtWidgets.QDialog):
+    """Basit gider ekleme penceresi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Gider Ekle")
+        layout = QtWidgets.QFormLayout(self)
+        self.desc_edit = QtWidgets.QLineEdit()
+        self.amount_edit = QtWidgets.QDoubleSpinBox()
+        self.amount_edit.setMaximum(9999999)
+        layout.addRow("Açıklama", self.desc_edit)
+        layout.addRow("Tutar", self.amount_edit)
+        btn = QtWidgets.QPushButton("Kaydet")
+        layout.addWidget(btn)
+        btn.clicked.connect(self.save)
+
+    def save(self):
+        desc = self.desc_edit.text().strip()
+        amount = float(self.amount_edit.value())
+        if not desc or amount == 0:
+            self.reject()
+            return
+        self.session.add(Gider(aciklama=desc, tutar=amount))
+        self.session.commit()
+        self.accept()
+
+
+class CashDialog(QtWidgets.QDialog):
+    """Tahsilat veya tediye işlemi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.selected_customer = None
+        self.setWindowTitle("Tahsilat/Tediye Yap")
+        layout = QtWidgets.QFormLayout(self)
+        cust_layout = QtWidgets.QHBoxLayout()
+        self.cust_label = QtWidgets.QLabel("-")
+        select_btn = QtWidgets.QPushButton("Müşteri Seç")
+        select_btn.clicked.connect(self.select_customer)
+        cust_layout.addWidget(self.cust_label)
+        cust_layout.addWidget(select_btn)
+        layout.addRow("Müşteri", cust_layout)
+        self.amount_edit = QtWidgets.QDoubleSpinBox()
+        self.amount_edit.setMaximum(9999999)
+        self.amount_edit.setMinimum(-9999999)
+        self.desc_edit = QtWidgets.QLineEdit()
+        layout.addRow("Tutar (+Tahsilat,-Tediye)", self.amount_edit)
+        layout.addRow("Açıklama", self.desc_edit)
+        btn = QtWidgets.QPushButton("Kaydet")
+        layout.addWidget(btn)
+        btn.clicked.connect(self.save)
+
+    def select_customer(self):
+        dlg = CustomerSelectDialog(self.session)
+        if (
+            dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted
+            and dlg.selected_customer
+        ):
+            self.selected_customer = dlg.selected_customer
+            self.cust_label.setText(self.selected_customer.ad_soyad)
+
+    def save(self):
+        if not self.selected_customer:
+            QtWidgets.QMessageBox.warning(self, "Hata", "Müşteri seçin")
+            return
+        amount = float(self.amount_edit.value())
+        hareket = CariHareket(
+            musteri_id=self.selected_customer.id,
+            tutar=amount,
+            aciklama=self.desc_edit.text().strip() or "Tahsilat",
+        )
+        self.session.add(hareket)
+        self.selected_customer.bakiye -= amount
+        self.session.commit()
+        self.accept()
+
+
+class ReportDialog(QtWidgets.QDialog):
+    """Gün sonu raporu penceresi."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Gün Sonu Raporu")
+        layout = QtWidgets.QVBoxLayout(self)
+        top = QtWidgets.QHBoxLayout()
+        top.addWidget(QtWidgets.QLabel("Tarih:"))
+        self.date_edit = QtWidgets.QDateEdit(QtCore.QDate.currentDate())
+        self.date_edit.setCalendarPopup(True)
+        top.addWidget(self.date_edit)
+        self.calc_btn = QtWidgets.QPushButton("Hesapla")
+        top.addWidget(self.calc_btn)
+        layout.addLayout(top)
+        self.result = QtWidgets.QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+        self.calc_btn.clicked.connect(self.calculate)
+
+    def calculate(self):
+        date = self.date_edit.date().toPyDate()
+        start = datetime.combine(date, datetime.min.time())
+        end = datetime.combine(date, datetime.max.time())
+        q = self.session.query(SatisKaydi).filter(
+            SatisKaydi.tarih >= start, SatisKaydi.tarih <= end
+        )
+        toplam_nakit = sum(
+            s.toplam_tutar
+            for s in q.filter(SatisKaydi.odeme_tipi == "Nakit", SatisKaydi.musteri_id == None)
+        )
+        toplam_kart = sum(
+            s.toplam_tutar
+            for s in q.filter(
+                SatisKaydi.odeme_tipi == "Kredi Kartı", SatisKaydi.musteri_id == None
+            )
+        )
+        toplam_veresiye = sum(
+            s.toplam_tutar for s in q.filter(SatisKaydi.musteri_id != None)
+        )
+        toplam_tahsilat = sum(
+            h.tutar
+            for h in self.session.query(CariHareket)
+            .filter(CariHareket.tarih >= start, CariHareket.tarih <= end, CariHareket.tutar > 0)
+        )
+        toplam_gider = sum(
+            g.tutar
+            for g in self.session.query(Gider)
+            .filter(Gider.tarih >= start, Gider.tarih <= end)
+        )
+        kasa_nakit = (toplam_nakit + toplam_tahsilat) - toplam_gider
+
+        lines = [
+            f"Toplam Nakit Satış: {toplam_nakit:.2f}",
+            f"Toplam K. Kartı Satış: {toplam_kart:.2f}",
+            f"Toplam Veresiye Satış: {toplam_veresiye:.2f}",
+            f"Toplam Tahsilat: {toplam_tahsilat:.2f}",
+            f"Toplam Gider: {toplam_gider:.2f}",
+            f"KASADAKİ NAKİT: {kasa_nakit:.2f}",
+        ]
+        self.result.setPlainText("\n".join(lines))
+
+
+class FinanceWindow(QtWidgets.QWidget):
+    """Finans işlemleri ve raporlar."""
+
+    def __init__(self, session: Session):
+        super().__init__()
+        self.session = session
+        self.setWindowTitle("Finans ve Raporlar")
+        layout = QtWidgets.QVBoxLayout(self)
+        self.btn_expense = QtWidgets.QPushButton("Gider Ekle")
+        self.btn_cash = QtWidgets.QPushButton("Tahsilat/Tediye Yap")
+        self.btn_report = QtWidgets.QPushButton("Raporlar")
+        layout.addWidget(self.btn_expense)
+        layout.addWidget(self.btn_cash)
+        layout.addWidget(self.btn_report)
+        self.btn_expense.clicked.connect(self.add_expense)
+        self.btn_cash.clicked.connect(self.add_cash)
+        self.btn_report.clicked.connect(self.show_report)
+
+    def add_expense(self):
+        dlg = ExpenseDialog(self.session)
+        dlg.exec()
+
+    def add_cash(self):
+        dlg = CashDialog(self.session)
+        dlg.exec()
+
+    def show_report(self):
+        dlg = ReportDialog(self.session)
+        dlg.exec()
 
 
 class MainWindow(QtWidgets.QWidget):
