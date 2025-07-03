@@ -11,6 +11,12 @@
     <div id="chat-box"></div>
     <input type="text" id="user-input" placeholder="Type your message" />
     <button onclick="sendMessage()">Send</button>
+
+    <hr>
+    <h2>Barcode Generator</h2>
+    <input type="text" id="barcode-data" placeholder="Enter data for barcode" />
+    <button onclick="generateBarcode()">Generate</button>
+    <div><img id="barcode-image" /></div>
     <script>
         async function sendMessage() {
             const inputEl = document.getElementById('user-input');
@@ -28,6 +34,19 @@
             } else {
                 box.innerHTML += '<div class="user">'+message+'</div>';
                 box.innerHTML += '<div class="bot">'+data.response+'</div>';
+            }
+        }
+
+        async function generateBarcode() {
+            const dataEl = document.getElementById('barcode-data');
+            const res = await fetch('/barcode', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({data: dataEl.value})
+            });
+            if(res.ok){
+                const blob = await res.blob();
+                document.getElementById('barcode-image').src = URL.createObjectURL(blob);
             }
         }
     </script>
